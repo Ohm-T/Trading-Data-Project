@@ -1,5 +1,5 @@
-from kafka import KafkaConsumer
-from river import evaluate
+from kafka import KafkaConsumer, TopicPartition
+from river import evaluate, datasets
 from river import linear_model
 from river import metrics
 from river import optim
@@ -13,49 +13,65 @@ import math
 
 def get_month_distances(x):
     return {
-        calendar.month_name[month]: math.exp(-(x.month - month) ** 2)
+        calendar.month_name[month]: math.exp(-(x['month'].month - month) ** 2)
         for month in range(1, 13)
     }
 
 
 def get_ordinal_date(x):
-    return {'ordinal_date': x.toordinal()}
+    return {'ordinal_date': x['month'].toordinal()}
 
 
-def read_and_predict(topic_name, horizon = 5):
+def read_and_learn(queue, topic_name):
     consumer = KafkaConsumer(topic_name, bootstrap_servers="localhost:9092", group_id='group-1', value_deserializer=lambda m: json.loads(m.decode()))
-    extract_features = compose.TransformerUnion(
-        get_ordinal_date,
-        get_month_distances
-    )
-    prediction = []
+    # extract_features = compose.TransformerUnion(
+    #     get_ordinal_date,
+    #     get_month_distances
+    # )
+
     model = (
-        extract_features |
         time_series.SNARIMAX(
-                            p=1,
-                            d=0,
-                            q=0,
-                            m=12,
-                            sp=3,
-                            sq=6,
-                            regressor=(
-                                    linear_model.LinearRegression(
-                                    intercept_init=110,
-                                    optimizer=optim.SGD(0.01),
-                                    intercept_lr=0.3
-                                ))
+                            p=10,
+                            d=1,
+                            q=10,
+                            m=10,
+                            sd = 1,
+                            # sp=3,
+                            # sq=6,
                             )
             )
 
     for i, msg in enumerate(consumer):
-        msg = msg.value
-        time = datetime.strptime(msg['Date'], "%Y-%m-%d %H:%M:%S")
-        close = msg['Close']
-        model = model.learn_one(time, close)
-        if i > 600:
-            forecast = model.forecast(horizon=horizon)
-            print(forecast)
-            prediction.append(forecast)
-            for y_pred in forecast:
-                print('Prediction for the next 5 days :', y_pred)
+        msg_val = msg.value
+        time = datetime.strptime(msg_val['Date'], "%Y-%m-%d %H:%M:%S")
+        close = msg_val['Close']
+        model = model.learn_one(close)
+
+        # get last position to break reading
+        tp = TopicPartition(topic_name,0)
+        consumer.seek_to_end(tp)
+        lastOffset = consumer.position(tp)
+        consumer.seek_to_beginning(tp) 
+        print('Learning msg_{}'.format(i))
+        if i == lastOffset-1:
+            break
+    queue.put(model)
+
+def predict(model, horizon = 100):
+    forecast = model.forecast(horizon=horizon)
+    prediction = []
+    for i, y_pred in enumerate(forecast):
+        prediction.append(y_pred)
+        print(f'Prediction for the next {i} days :', y_pred)
     return prediction
+
+# extract_features = compose.TransformerUnion(
+#         get_ordinal_date,
+#         get_month_distances
+#     )
+# for x, y in datasets.AirlinePassengers():
+#     time = "2022-08-01 00:00:00"
+#     time = datetime.strptime(time, "%Y-%m-%d %H:%M:%S")
+#     extract_features = extract_features.learn_one(x)
+#     print(extract_features.transform_one(x))
+#     print(y)

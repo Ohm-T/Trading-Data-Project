@@ -16,4 +16,4 @@ def topic_management(tickers=['goog','aapl','baba','bnp.pa','ing', 'nvs']):
     topic_pred_list =  [NewTopic(name=ticker, num_partitions=1, replication_factor=1) for ticker in topic_list_pred]
     admin_client.create_topics(new_topics=topic_list, validate_only=False)
     admin_client.create_topics(new_topics=topic_pred_list, validate_only=False)
-    
+
