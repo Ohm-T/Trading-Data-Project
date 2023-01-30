@@ -15,6 +15,24 @@ def check_list_topics():
     os.popen('kafka-topics.bat --bootstrap-server localhost:9092 --list')
 
 
+# def multi_run(ingest_data, list_train, read_and_learn, topic_test):
+#     q = Queue()
+#     procs = []
+#     rets = dict()
+#     p = Process(target=ingest_data, args=(list_train, list_tickers))
+#     procs.append(p)
+#     p.start()
+#     for topic in topic_test:
+#         p = Process(target=read_and_learn, args=(q, topic))
+#         procs.append(p)
+#         p.start()
+#         ret = q.get()
+#         rets[topic] = ret
+    
+#     for p in procs:
+#         p.join()
+#     return rets
+
 def multi_run(ingest_data, list_train, read_and_learn, topic_test):
     q = Queue()
     procs = []

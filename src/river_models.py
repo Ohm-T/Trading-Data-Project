@@ -42,19 +42,21 @@ def read_and_learn(queue, topic_name):
             )
 
     for i, msg in enumerate(consumer):
-        msg_val = msg.value
-        time = datetime.strptime(msg_val['Date'], "%Y-%m-%d %H:%M:%S")
-        close = msg_val['Close']
-        model = model.learn_one(close)
-
-        # get last position to break reading
-        tp = TopicPartition(topic_name,0)
-        consumer.seek_to_end(tp)
-        lastOffset = consumer.position(tp)
-        consumer.seek_to_beginning(tp) 
-        print('Learning msg_{}'.format(i))
-        if i == lastOffset-1:
+        if i==419:
             break
+        else:
+            msg_val = msg.value
+            time = datetime.strptime(msg_val['Date'], "%Y-%m-%d %H:%M:%S")
+            close = msg_val['Close']
+            model = model.learn_one(close)
+
+            # get last position to break reading
+            tp = TopicPartition(topic_name,0)
+            consumer.seek_to_end(tp)
+            lastOffset = consumer.position(tp)
+            consumer.seek_to_beginning(tp) 
+            print('Learning msg_{}'.format(i))
+
     queue.put(model)
 
 def predict(model, horizon = 100):
